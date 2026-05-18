@@ -228,8 +228,11 @@ class MultiTurnSFTDataset(Dataset):
 
         # remove system prompt if exists
         if index != 0 and message["role"] != "system":
-            input_ids = input_ids[len(self.system_prompt) :]
-            attention_mask = attention_mask[len(self.system_prompt) :]
+            trim_len = len(self.system_prompt)
+            input_ids = input_ids[trim_len:]
+            attention_mask = attention_mask[trim_len:]
+            if "token_type_ids" in inputs:
+                inputs["token_type_ids"] = inputs["token_type_ids"][..., trim_len:]
 
         if message["role"] == "assistant":
             loss_mask = torch.ones_like(attention_mask)
@@ -330,6 +333,8 @@ class MultiTurnSFTDataset(Dataset):
             if k == "mm_token_type_ids":
                 keys_to_remove.append(k)
                 continue
+            if k == "token_type_ids":
+                continue
             if len(v) > 0 and v[0] is not None and isinstance(v[0], torch.Tensor):
                 # Check if all tensors in the list have the same shape
                 first_shape = v[0].shape[1:]
@@ -340,7 +345,10 @@ class MultiTurnSFTDataset(Dataset):
             del multi_modal_inputs[k]
 
         for k, v in multi_modal_inputs.items():
-            multi_modal_inputs[k] = torch.concat(v, dim=0)
+            if k == "token_type_ids":
+                multi_modal_inputs[k] = torch.concat(v, dim=-1)
+            else:
+                multi_modal_inputs[k] = torch.concat(v, dim=0)
 
         # 2. handle position_ids for Qwen-VL series models
         if self.processor is not None and "Qwen2VLImageProcessor" in self.processor.image_processor.__class__.__name__:
@@ -376,17 +384,29 @@ class MultiTurnSFTDataset(Dataset):
                 attention_mask = torch.cat((attention_mask, padded_attention_mask))
                 loss_mask = torch.cat((loss_mask, padded_loss_mask))
                 position_ids = F.pad(position_ids, (0, self.max_length - sequence_length), value=0)
+                if "token_type_ids" in multi_modal_inputs:
+                    multi_modal_inputs["token_type_ids"] = F.pad(
+                        multi_modal_inputs["token_type_ids"], (0, self.max_length - sequence_length), value=0
+                    )
             elif sequence_length > self.max_length:
                 if self.truncation == "left":
                     input_ids = input_ids[-self.max_length :]
                     attention_mask = attention_mask[-self.max_length :]
                     loss_mask = loss_mask[-self.max_length :]
                     position_ids = position_ids[..., -self.max_length :]
+                    if "token_type_ids" in multi_modal_inputs:
+                        multi_modal_inputs["token_type_ids"] = multi_modal_inputs["token_type_ids"][
+                            ..., -self.max_length :
+                        ]
                 elif self.truncation == "right":
                     input_ids = input_ids[: self.max_length]
                     attention_mask = attention_mask[: self.max_length]
                     loss_mask = loss_mask[: self.max_length]
                     position_ids = position_ids[..., : self.max_length]
+                    if "token_type_ids" in multi_modal_inputs:
+                        multi_modal_inputs["token_type_ids"] = multi_modal_inputs["token_type_ids"][
+                            ..., : self.max_length
+                        ]
                 elif self.truncation == "error":
                     raise ValueError(f"{sequence_length=} is larger than {self.max_length=}")
                 else:
@@ -409,6 +429,8 @@ class MultiTurnSFTDataset(Dataset):
                 input_ids = input_ids[: self.max_length]
                 loss_mask = loss_mask[: self.max_length]
                 position_ids = position_ids[..., : self.max_length]
+                if "token_type_ids" in multi_modal_inputs:
+                    multi_modal_inputs["token_type_ids"] = multi_modal_inputs["token_type_ids"][..., : self.max_length]
 
             # return nested tensor with out padding
             res = {

@@ -222,6 +222,8 @@ def hf_processor(name_or_path, **kwargs):
                 from transformers.models.glm4v import Glm4vModel
 
                 model_class = Glm4vModel
+            case "Gemma3Processor":
+                pass  # Gemma3Processor/Gemma3Model don't have get_rope_index property
             case "MllamaProcessor":
                 pass  # MllamaProcessor and MllamaModel doesn't have get_rope_index property
             case _:

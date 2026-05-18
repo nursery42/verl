@@ -756,6 +756,12 @@ class AgentLoopWorker:
         # We must use dict(multi_modal_inputs) to convert BatchFeature values to a new dict
         # because np.array() only keeps the keys for BatchFeature.
         multi_modal_inputs = dict(multi_modal_inputs.convert_to_tensors("pt"))
+        if "token_type_ids" in multi_modal_inputs:
+            image_token_id = get_processor_token_id(self.processor, "image")
+            if image_token_id is not None:
+                token_type_ids = torch.zeros_like(input_ids)
+                token_type_ids[input_ids == image_token_id] = 1
+                multi_modal_inputs["token_type_ids"] = token_type_ids
         image_grid_thw = multi_modal_inputs.get("image_grid_thw")
         if image_grid_thw is not None:
             images_seqlens = torch.repeat_interleave(image_grid_thw[:, 1] * image_grid_thw[:, 2], image_grid_thw[:, 0])
@@ -771,6 +777,8 @@ class AgentLoopWorker:
     ) -> torch.Tensor:
         """Compute position ids for multi-modal inputs."""
         if self.processor is None:
+            return compute_position_id_with_mask(attention_mask)  # (1, seq_len)
+        if not hasattr(self.processor, "get_rope_index"):
             return compute_position_id_with_mask(attention_mask)  # (1, seq_len)
 
         multi_modal_kwargs = {

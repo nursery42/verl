@@ -136,4 +136,6 @@ def apply_chat_template(
             output["attention_mask"] = output["attention_mask"][:, prefix_len:]
             if "mm_token_type_ids" in output:
                 output["mm_token_type_ids"] = output["mm_token_type_ids"][:, prefix_len:]
+            if "token_type_ids" in output:
+                output["token_type_ids"] = output["token_type_ids"][:, prefix_len:]
             return output
