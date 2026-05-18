@@ -222,8 +222,8 @@ def hf_processor(name_or_path, **kwargs):
                 from transformers.models.glm4v import Glm4vModel
 
                 model_class = Glm4vModel
-            case "MllamaProcessor":
-                pass  # MllamaProcessor and MllamaModel doesn't have get_rope_index property
+            case "MllamaProcessor" | "Gemma3Processor" | "Gemma4Processor":
+                pass  # These processors don't have get_rope_index property
             case _:
                 raise ValueError(f"Unsupported processor type: {processor.__class__.__name__}")
 

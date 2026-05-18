@@ -770,7 +770,7 @@ class AgentLoopWorker:
         mm_processor_kwargs: Optional[dict[str, Any]] = None,
     ) -> torch.Tensor:
         """Compute position ids for multi-modal inputs."""
-        if self.processor is None:
+        if self.processor is None or not hasattr(self.processor, "get_rope_index"):
             return compute_position_id_with_mask(attention_mask)  # (1, seq_len)
 
         multi_modal_kwargs = {
